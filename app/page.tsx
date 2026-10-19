@@ -1,69 +1,205 @@
-import Image from "next/image";
+// app/page.tsx
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { Html5Qrcode } from 'html5-qrcode';
 
 export default function Home() {
+  const [vehicleType, setVehicleType] = useState('Motorcycle');
+  const [entranceResult, setEntranceResult] = useState<any>(null);
+  
+  const [scanResult, setScanResult] = useState<any>(null);
+  const [amountPaid, setAmountPaid] = useState('');
+  const [paymentResult, setPaymentResult] = useState<any>(null);
+  
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const handleIssueTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/entrance/issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicle_type: vehicleType }),
+      });
+      const data = await res.json();
+      setEntranceResult(data);
+      setScanResult(null);
+      setPaymentResult(null);
+    } catch (err) {
+      console.error("Issue Ticket Error:", err);
+    }
+  };
+
+  const handleScanTicket = async (ticketIdToScan: string) => {
+    try {
+      const res = await fetch('/api/exit/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket_id: ticketIdToScan }),
+      });
+      const data = await res.json();
+      setScanResult(data);
+    } catch (err) {
+      console.error("Scan Error:", err);
+    }
+  };
+
+  const handlePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scanResult) return;
+    try {
+      const res = await fetch('/api/exit/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: scanResult.session_id,
+          amount_due: scanResult.amount_due,
+          amount_paid: parseFloat(amountPaid),
+          payment_method: 'Cash',
+          attendant_name: 'Maria Santos'
+        }),
+      });
+      const data = await res.json();
+      setPaymentResult(data);
+    } catch (err) {
+      console.error("Payment Error:", err);
+    }
+  };
+
+  const startCameraScan = async () => {
+    setIsScanning(true);
+    setScanResult(null);
+    
+    setTimeout(async () => {
+      try {
+        const html5QrCode = new Html5Qrcode("reader");
+        scannerRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          async (decodedText) => {
+            await handleScanTicket(decodedText);
+            await html5QrCode.stop();
+            scannerRef.current = null;
+            setIsScanning(false);
+          },
+          () => {}
+        );
+      } catch (err) {
+        console.error("Camera start failed:", err);
+        setIsScanning(false);
+      }
+    }, 100);
+  };
+
+  const stopCameraScan = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current = null;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setIsScanning(false);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '800px', margin: '0 auto' }}>
+      <h1>Naga Smart Park - Operations Dashboard</h1>
+
+      {/* 1. Entrance Section */}
+      <section style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px' }}>
+        <h2>1. Entrance Kiosk (Issue Ticket)</h2>
+        <form onSubmit={handleIssueTicket}>
+          <label>Vehicle Type: </label>
+          <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)}>
+            <option value="Motorcycle">Motorcycle</option>
+            <option value="Car">Car</option>
+            <option value="Van">Van</option>
+            <option value="Other">Other</option>
+          </select>
+          <button type="submit" style={{ marginLeft: '1rem' }}>Issue Ticket</button>
+        </form>
+
+        {entranceResult && entranceResult.success && (
+          <div style={{ marginTop: '1rem', background: '#f4f4f4', padding: '1rem', borderRadius: '6px', textAlign: 'center' }}>
+            <p style={{ color: '#000' }}><strong>Ticket ID:</strong> {entranceResult.ticket.ticket_id}</p>
+            <div style={{ marginTop: '1rem', background: '#fff', padding: '1rem', display: 'inline-block', borderRadius: '4px' }}>
+              <QRCodeCanvas value={entranceResult.ticket.ticket_id} size={150} />
+              <div style={{ marginTop: '0.75rem', fontSize: '1.4rem', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
+                {entranceResult.spot_number}
+              </div>
+            </div>
+          </div>
+        )}
+        {entranceResult && !entranceResult.success && (
+          <p style={{ color: 'red', marginTop: '0.5rem' }}>{entranceResult.error}</p>
+        )}
+      </section>
+
+      {/* 2. Exit Scan Section */}
+      <section style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px' }}>
+        <h2>2. Exit Terminal (Camera Scanner)</h2>
+        
+        {!isScanning ? (
+          <button 
+            onClick={startCameraScan}
+            style={{ padding: '0.6rem 1.2rem', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            Open Camera to Scan QR
+          </button>
+        ) : (
+          <div>
+            <button 
+              onClick={stopCameraScan}
+              style={{ marginBottom: '0.75rem', padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Close Camera
+            </button>
+            <div id="reader" style={{ width: '100%', maxWidth: '350px', margin: '0 auto' }}></div>
+          </div>
+        )}
+
+        {scanResult && scanResult.success && (
+          <div style={{ marginTop: '1rem', background: '#e6f4ea', padding: '1rem', borderRadius: '6px' }}>
+            <p style={{ color: '#137333', fontWeight: 'bold' }}>✓ Scanned Successfully</p>
+            <p><strong>Spot:</strong> {scanResult.spot_number} ({scanResult.vehicle_type})</p>
+            <p><strong>Duration:</strong> {scanResult.duration_mins} mins</p>
+            <p><strong>Amount Due:</strong> ₱{scanResult.amount_due}</p>
+          </div>
+        )}
+        {scanResult && !scanResult.success && (
+          <p style={{ color: 'red', marginTop: '1rem' }}>{scanResult.error}</p>
+        )}
+      </section>
+
+      {/* 3. Payment Section */}
+      {scanResult && scanResult.success && (
+        <section style={{ border: '1px solid #ccc', padding: '1rem', borderRadius: '8px', background: '#fafafa' }}>
+          <h2>3. Complete Payment</h2>
+          <form onSubmit={handlePayment}>
+            <label>Cash Tendered: ₱</label>
+            <input 
+              type="number" 
+              value={amountPaid} 
+              onChange={(e) => setAmountPaid(e.target.value)} 
+              placeholder="0.00" 
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <button type="submit" style={{ marginLeft: '1rem' }}>Process Payment & Release Spot</button>
+          </form>
+          {paymentResult && paymentResult.success && (
+            <div style={{ marginTop: '1rem', background: '#e6f4ea', padding: '0.8rem', borderRadius: '4px' }}>
+              <p style={{ color: '#137333', fontWeight: 'bold' }}>Payment Completed!</p>
+              <p>Change: ₱{paymentResult.change}</p>
+            </div>
+          )}
+        </section>
+      )}
+    </main>
   );
 }
