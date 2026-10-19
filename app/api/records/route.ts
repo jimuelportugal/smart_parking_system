@@ -1,10 +1,6 @@
 // app/api/records/route.ts
 import { NextResponse } from 'next/server';
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/naga_smart_park",
-});
+import { pool } from '@/lib/db';
 
 export async function GET() {
   try {
