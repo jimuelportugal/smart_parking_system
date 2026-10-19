@@ -29,7 +29,7 @@ export default function Home() {
       setScanResult(null);
       setPaymentResult(null);
     } catch (err) {
-      console.error("Issue Ticket Error:", err);
+      console.error(err);
     }
   };
 
@@ -43,7 +43,7 @@ export default function Home() {
       const data = await res.json();
       setScanResult(data);
     } catch (err) {
-      console.error("Scan Error:", err);
+      console.error(err);
     }
   };
 
@@ -65,38 +65,36 @@ export default function Home() {
       const data = await res.json();
       setPaymentResult(data);
     } catch (err) {
-      console.error("Payment Error:", err);
+      console.error(err);
     }
   };
 
-  const startCameraScan = async () => {
+  const startScanner = async () => {
     setIsScanning(true);
     setScanResult(null);
-    
     setTimeout(async () => {
       try {
-        const html5QrCode = new Html5Qrcode("reader");
-        scannerRef.current = html5QrCode;
-
-        await html5QrCode.start(
+        const qrCode = new Html5Qrcode("reader");
+        scannerRef.current = qrCode;
+        await qrCode.start(
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 250, height: 250 } },
           async (decodedText) => {
             await handleScanTicket(decodedText);
-            await html5QrCode.stop();
+            await qrCode.stop();
             scannerRef.current = null;
             setIsScanning(false);
           },
           () => {}
         );
       } catch (err) {
-        console.error("Camera start failed:", err);
+        console.error(err);
         setIsScanning(false);
       }
     }, 100);
   };
 
-  const stopCameraScan = async () => {
+  const stopScanner = async () => {
     if (scannerRef.current) {
       try {
         await scannerRef.current.stop();
@@ -108,11 +106,18 @@ export default function Home() {
     setIsScanning(false);
   };
 
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
+
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '800px', margin: '0 auto' }}>
       <h1>Naga Smart Park - Operations Dashboard</h1>
 
-      {/* 1. Entrance Section */}
       <section style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px' }}>
         <h2>1. Entrance Kiosk (Issue Ticket)</h2>
         <form onSubmit={handleIssueTicket}>
@@ -142,24 +147,17 @@ export default function Home() {
         )}
       </section>
 
-      {/* 2. Exit Scan Section */}
       <section style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px' }}>
-        <h2>2. Exit Terminal (Camera Scanner)</h2>
+        <h2>2. Exit Terminal (Live Camera Scanner)</h2>
         
         {!isScanning ? (
-          <button 
-            onClick={startCameraScan}
-            style={{ padding: '0.6rem 1.2rem', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
-          >
-            Open Camera to Scan QR
+          <button onClick={startScanner} style={{ padding: '0.6rem 1.2rem', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            Start Live Camera Scan
           </button>
         ) : (
           <div>
-            <button 
-              onClick={stopCameraScan}
-              style={{ marginBottom: '0.75rem', padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Close Camera
+            <button onClick={stopScanner} style={{ marginBottom: '0.75rem', padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              Stop Camera
             </button>
             <div id="reader" style={{ width: '100%', maxWidth: '350px', margin: '0 auto' }}></div>
           </div>
@@ -168,9 +166,9 @@ export default function Home() {
         {scanResult && scanResult.success && (
           <div style={{ marginTop: '1rem', background: '#e6f4ea', padding: '1rem', borderRadius: '6px' }}>
             <p style={{ color: '#137333', fontWeight: 'bold' }}>✓ Scanned Successfully</p>
-            <p><strong>Spot:</strong> {scanResult.spot_number} ({scanResult.vehicle_type})</p>
-            <p><strong>Duration:</strong> {scanResult.duration_mins} mins</p>
-            <p><strong>Amount Due:</strong> ₱{scanResult.amount_due}</p>
+            <p style={{ color: '#000' }}><strong>Spot:</strong> {scanResult.spot_number} ({scanResult.vehicle_type})</p>
+            <p style={{ color: '#000' }}><strong>Duration:</strong> {scanResult.duration_mins} mins</p>
+            <p style={{ color: '#000' }}><strong>Amount Due:</strong> ₱{scanResult.amount_due}</p>
           </div>
         )}
         {scanResult && !scanResult.success && (
@@ -178,12 +176,11 @@ export default function Home() {
         )}
       </section>
 
-      {/* 3. Payment Section */}
       {scanResult && scanResult.success && (
         <section style={{ border: '1px solid #ccc', padding: '1rem', borderRadius: '8px', background: '#fafafa' }}>
           <h2>3. Complete Payment</h2>
           <form onSubmit={handlePayment}>
-            <label>Cash Tendered: ₱</label>
+            <label style={{ color: '#000' }}>Cash Tendered: ₱</label>
             <input 
               type="number" 
               value={amountPaid} 
@@ -195,7 +192,7 @@ export default function Home() {
           {paymentResult && paymentResult.success && (
             <div style={{ marginTop: '1rem', background: '#e6f4ea', padding: '0.8rem', borderRadius: '4px' }}>
               <p style={{ color: '#137333', fontWeight: 'bold' }}>Payment Completed!</p>
-              <p>Change: ₱{paymentResult.change}</p>
+              <p style={{ color: '#000' }}>Change: ₱{paymentResult.change}</p>
             </div>
           )}
         </section>
