@@ -5,12 +5,16 @@ import { useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 
 export default function EntranceKiosk() {
-  const [vehicleType, setVehicleType] = useState('Motorcycle');
+  const [vehicleType, setVehicleType] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
 
-  const handleIssue = async (e: React.FormEvent) => {
+  const handleGetTicket = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!vehicleType) {
+      setError('Please select a vehicle type');
+      return;
+    }
     setError('');
     setResult(null);
 
@@ -33,7 +37,7 @@ export default function EntranceKiosk() {
   return (
     <div>
       <h2 className="text-lg font-semibold text-slate-800 mb-4">Entrance - Get Ticket</h2>
-      <form onSubmit={handleIssue} className="space-y-4">
+      <form onSubmit={handleGetTicket} className="space-y-4">
         <div>
           <label className="block text-xs font-medium text-slate-600 uppercase mb-2">Select Vehicle Type</label>
           <div className="grid grid-cols-2 gap-3">
