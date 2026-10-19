@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
-  allowedDevOrigins: ['smooth-bags-punch.loca.lt'],
+  allowedDevOrigins: ['192.168.8.45'],
   turbopack: {
     rules: {
       "*.css": {

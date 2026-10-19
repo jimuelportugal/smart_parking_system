@@ -16,6 +16,23 @@ export default function Home() {
   const [isScanning, setIsScanning] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [records, setRecords] = useState<{ spots: any[], sessions: any[], transactions: any[] }>({ spots: [], sessions: [], transactions: [] });
+
+  const fetchRecords = async () => {
+    try {
+      const res = await fetch('/api/records');
+      const data = await res.json();
+      if (data.success) {
+        setRecords(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, []);
 
   const handleIssueTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +46,7 @@ export default function Home() {
       setEntranceResult(data);
       setScanResult(null);
       setPaymentResult(null);
+      fetchRecords();
     } catch (err) {
       console.error(err);
     }
@@ -65,6 +83,7 @@ export default function Home() {
       });
       const data = await res.json();
       setPaymentResult(data);
+      fetchRecords();
     } catch (err) {
       console.error(err);
     }
@@ -72,44 +91,51 @@ export default function Home() {
 
   const startScanner = async () => {
     setCameraError(null);
-    setIsScanning(true);
     setScanResult(null);
 
-    setTimeout(async () => {
-      try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("Camera API (getUserMedia) not supported or blocked by browser security (HTTP requires HTTPS on mobile devices).");
-        }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError("BROWSER BLOCK: Camera API disabled on HTTP. Please enable the insecure origin flag in chrome://flags.");
+      return;
+    }
 
-        const qrCode = new Html5Qrcode("reader");
-        scannerRef.current = qrCode;
-        await qrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          async (decodedText) => {
-            await handleScanTicket(decodedText);
-            await qrCode.stop();
-            scannerRef.current = null;
-            setIsScanning(false);
-          },
-          () => {}
-        );
-      } catch (err: any) {
-        console.error("Camera start error:", err);
-        setCameraError(err?.message || "Failed to access camera. Note: Mobile browsers block camera access over plain HTTP. Use HTTPS/tunneling or localhost.");
-        setIsScanning(false);
+    setIsScanning(true);
+
+    try {
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode("reader");
       }
-    }, 150);
+
+      await scannerRef.current.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decodedText) => {
+          if (scannerRef.current && scannerRef.current.isScanning) {
+            await scannerRef.current.stop();
+          }
+          scannerRef.current = null;
+          setIsScanning(false);
+          await handleScanTicket(decodedText);
+        },
+        () => {}
+      );
+    } catch (err: any) {
+      console.error("Camera start error:", err);
+      setCameraError(err?.message || "Failed to start camera. Ensure permissions are granted.");
+      setIsScanning(false);
+      scannerRef.current = null;
+    }
   };
 
   const stopScanner = async () => {
     if (scannerRef.current) {
       try {
-        await scannerRef.current.stop();
-        scannerRef.current = null;
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
       } catch (e) {
         console.error(e);
       }
+      scannerRef.current = null;
     }
     setIsScanning(false);
   };
@@ -126,7 +152,6 @@ export default function Home() {
     <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '800px', margin: '0 auto', color: '#333' }}>
       <h1 style={{ color: '#111' }}>Naga Smart Park - Operations Dashboard</h1>
 
-      {/* 1. Entrance Section */}
       <section style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px', background: '#fff' }}>
         <h2 style={{ color: '#222' }}>1. Entrance Kiosk (Issue Ticket)</h2>
         <form onSubmit={handleIssueTicket}>
@@ -156,22 +181,22 @@ export default function Home() {
         )}
       </section>
 
-      {/* 2. Exit Section */}
       <section style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px', background: '#fff' }}>
         <h2 style={{ color: '#222' }}>2. Exit Terminal (Live Camera Scanner)</h2>
         
-        {!isScanning ? (
-          <button onClick={startScanner} style={{ padding: '0.6rem 1.2rem', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-            SCAN TICKET
-          </button>
-        ) : (
-          <div>
-            <button onClick={stopScanner} style={{ marginBottom: '0.75rem', padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          {!isScanning ? (
+            <button onClick={startScanner} style={{ padding: '0.6rem 1.2rem', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              Scan Ticket
+            </button>
+          ) : (
+            <button onClick={stopScanner} style={{ padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
               Stop Camera
             </button>
-            <div id="reader" style={{ width: '100%', maxWidth: '350px', margin: '0 auto', background: '#000' }}></div>
-          </div>
-        )}
+          )}
+        </div>
+
+        <div id="reader" style={{ width: '100%', maxWidth: '350px', margin: '0 auto', display: isScanning ? 'block' : 'none', background: '#000', minHeight: '250px' }}></div>
 
         {cameraError && (
           <div style={{ marginTop: '1rem', background: '#fde8e8', border: '1px solid #f8b4b4', padding: '0.75rem', borderRadius: '6px' }}>
@@ -192,9 +217,8 @@ export default function Home() {
         )}
       </section>
 
-      {/* 3. Payment Section */}
       {scanResult && scanResult.success && (
-        <section style={{ border: '1px solid #ccc', padding: '1rem', borderRadius: '8px', background: '#fafafa' }}>
+        <section style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px', background: '#fafafa' }}>
           <h2 style={{ color: '#222' }}>3. Complete Payment</h2>
           <form onSubmit={handlePayment}>
             <label style={{ color: '#000', fontWeight: 'bold' }}>Cash Tendered: ₱</label>
@@ -217,6 +241,51 @@ export default function Home() {
           )}
         </section>
       )}
+
+      <section style={{ border: '1px solid #ccc', padding: '1rem', borderRadius: '8px', background: '#fff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ color: '#222', margin: 0 }}>4. Live Database Records Dashboard</h2>
+          <button onClick={fetchRecords} style={{ padding: '0.4rem 0.8rem', background: '#333', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            Refresh Records
+          </button>
+        </div>
+
+        <h3 style={{ color: '#444', marginTop: '1rem' }}>Spots ({records.spots.length})</h3>
+        <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #eee', fontSize: '0.85rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', color: '#000' }}>
+            <thead>
+              <tr style={{ background: '#f4f4f4' }}><th style={{ padding: '4px' }}>Spot</th><th style={{ padding: '4px' }}>Type</th><th style={{ padding: '4px' }}>Status</th></tr>
+            </thead>
+            <tbody>
+              {records.spots.map(s => (
+                <tr key={s.id} style={{ borderTop: '1px solid #eee' }}>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>{s.spot_number}</td>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>{s.vehicle_type}</td>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>{s.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style={{ color: '#444', marginTop: '1rem' }}>Sessions ({records.sessions.length})</h3>
+        <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #eee', fontSize: '0.85rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', color: '#000' }}>
+            <thead>
+              <tr style={{ background: '#f4f4f4' }}><th style={{ padding: '4px' }}>Ticket ID</th><th style={{ padding: '4px' }}>Status</th><th style={{ padding: '4px' }}>Time In</th></tr>
+            </thead>
+            <tbody>
+              {records.sessions.map(ses => (
+                <tr key={ses.id} style={{ borderTop: '1px solid #eee' }}>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>{ses.ticket_id}</td>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>{ses.status}</td>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>{ses.time_in}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   );
 }
