@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const rateId = rateRes.rows[0].id;
 
     // 3. Generate ticket and QR code
-    const ticket_id = 'TKT-' + Date.now();
+    const ticket_id = 'NSP-' + Date.now();
     const qr_code = 'QR-' + ticket_id;
 
     // 4. Create active session

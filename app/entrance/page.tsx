@@ -1,3 +1,4 @@
+// app/entrance/page.tsx
 'use client';
 
 import EntranceKiosk from '@/components/entrance-kiosk';

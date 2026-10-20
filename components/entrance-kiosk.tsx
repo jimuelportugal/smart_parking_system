@@ -70,9 +70,9 @@ export default function EntranceKiosk() {
 
       {result && (
         <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
-          <p className="text-xs text-slate-500 uppercase font-semibold">Ticket ID: {result.ticket_id}</p>
+          <p className="text-xs text-slate-500 uppercase font-semibold">Ticket ID: {result.ticket?.ticket_id}</p>
           <div className="my-3 p-3 bg-white inline-block border border-slate-200 rounded">
-            <QRCodeCanvas value={result.ticket_id} size={160} />
+            <QRCodeCanvas value={result.ticket?.ticket_id} size={160} />
           </div>
           <p className="text-xl font-bold text-slate-900 uppercase">Slot: {result.spot_number}</p>
         </div>
