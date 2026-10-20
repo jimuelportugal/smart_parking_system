@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-export default function ExitKiosk() {
+export default function ExitKiosk({ initialTicketId }: { initialTicketId?: string }) {
   const [scanResult, setScanResult] = useState<any>(null);
   const [amountPaid, setAmountPaid] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -27,6 +27,14 @@ export default function ExitKiosk() {
       setError(err.message);
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ticketIdParam = params.get('ticket_id');
+    if (ticketIdParam && ticketIdParam !== 'undefined') {
+      handleScanTicket(ticketIdParam);
+    }
+  }, []);
 
   const startScanner = async () => {
     setCameraError(null);
@@ -79,7 +87,7 @@ export default function ExitKiosk() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: scanResult.session_id,
+          session_id: scanResult.id,
           amount_paid: parseFloat(amountPaid),
           payment_method: 'Cash',
           attendant_name: 'System Admin',
